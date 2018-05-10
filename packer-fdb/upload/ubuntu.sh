@@ -19,24 +19,23 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get clean && apt-get update
-apt-get install -y -qq python lsb
-
-dpkg -i foundationdb-clients_5.1.7-1_amd64.deb
-# client tools are installed at this point
-
+apt-get install -y -qq python lsb wget
 
 # fix policies (applies to docker)
 mv policy-rc.d /usr/sbin
 
+cd /tmp
 
-# to avoid install problem
-dpkg -i foundationdb-server_5.1.7-1_amd64.deb
+#download the dependencies
+wget https://www.foundationdb.org/downloads/5.1.7/ubuntu/installers/foundationdb-clients_5.1.7-1_amd64.deb
+wget https://www.foundationdb.org/downloads/5.1.7/ubuntu/installers/foundationdb-server_5.1.7-1_amd64.deb
 
-/usr/lib/foundationdb/make_public.py
+#server depends on the client packages
+dpkg -i foundationdb-clients_5.1.7-1_amd64.deb
+dpkg -i  foundationdb-server_5.1.7-1_amd64.deb
 
-# make the directory and the cluster file writeable
-chmod 777 /etc/foundationdb
-chmod 666 /etc/foundationdb/fdb.cluster
+# stop the service
+service foundationdb stop
 
 #chown -R foundationdb:foundationdb /etc/foundationdb
 

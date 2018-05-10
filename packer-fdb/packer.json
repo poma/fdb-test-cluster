@@ -10,23 +10,31 @@
             "access_key": "{{user `aws_access_key`}}",
             "secret_key": "{{user `aws_secret_key`}}",
             "region": "eu-central-1",
-            "source_ami": "ami-373717dc",
+            "source_ami_filter": {
+                "filters": {
+                    "virtualization-type": "hvm",
+                    "name": "ubuntu/images/*ubuntu-xenial-16.04-amd64-server-*",
+                    "root-device-type": "ebs"
+                },
+                "owners": ["099720109477"],
+                "most_recent": true
+            },
             "instance_type": "t2.small",
-            "ssh_username": "admin",
+            "ssh_username": "ubuntu",
             "ami_name": "bitgn-fdb",
             "force_deregister": true,
             
-            "ami_description": "Debian 9.4 with FDB installed",
+            "ami_description": "Ubuntu 16:04 with FoundationDB server",
             "tags": {
-                "OS_Version" : "Debian",
-                "Release": "9.4",
+                "OS_Version" : "Ubuntu",
+                "Release": "16.04",
                 "Component": "fdb"
             }
         },
         {
             "name": "test",
             "type": "docker",
-            "image": "debian:9.4",
+            "image": "ubuntu:16.04",
             "discard": true
         }
     ],
@@ -41,7 +49,7 @@
             "inline": [
                 "sleep 30",
                 "cd /tmp",
-                "./debian.sh"
+                "./ubuntu.sh"
             ]
         }
     ]

@@ -13,21 +13,7 @@ data "aws_ami" "fdb" {
  
   filter {
     name = "name"
-    values = ["bitgn-fdb"]
-  }
-  owners = ["self"]
-}
-
-
-
-// Find our latest available AMI for the fdb testing node
-// TODO: switch to a shared and hosted stable image
-data "aws_ami" "tester" {
-  most_recent = true
-
-  filter {
-    name = "name"
-    values = ["bitgn-tester"]
+    values = ["poma-fdb"]
   }
   owners = ["self"]
 }
@@ -63,7 +49,7 @@ resource "aws_subnet" "client" {
 
   tags = {
     Name = "Client Subnet"
-    Project = "TF:bitgn"
+    Project = "TF:poma"
   }
 }
 
@@ -77,7 +63,7 @@ resource "aws_subnet" "db" {
 
   tags = {
     Name = "FDB Subnet"
-    Project = "TF:bitgn"
+    Project = "TF:poma"
   }
 }
 
@@ -86,7 +72,7 @@ resource "aws_subnet" "db" {
 # security group with only SSH access
 resource "aws_security_group" "tester_group" {
   name        = "tf_tester_group"
-  description = "Terraform: SSH only"
+  description = "Terraform: SSH and FDB and mosh"
   vpc_id      = "${aws_vpc.default.id}"
 
   # SSH access from anywhere
@@ -105,7 +91,13 @@ resource "aws_security_group" "tester_group" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-
+  # FDB access from the VPC. We open a port for each process
+  ingress {
+    from_port   = 4500
+    to_port     = "${4500 + var.fdb_procs_per_machine - 1}"
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
   # outbound internet access
   egress {
     from_port   = 0
@@ -169,7 +161,7 @@ resource "aws_instance" "tester" {
   availability_zone = "${var.aws_availability_zone}"
 
   # Grab AMI id from the data source
-  ami = "${data.aws_ami.tester.id}"
+  ami = "${data.aws_ami.fdb.id}"
 
   # The name of our SSH keypair we created above.
   key_name = "${aws_key_pair.auth.id}"
@@ -182,7 +174,7 @@ resource "aws_instance" "tester" {
 
   tags {
     Name = "Tester"
-    Project = "TF:bitgn"
+    Project = "TF:poma"
   }
 
   provisioner "file" {
@@ -190,10 +182,15 @@ resource "aws_instance" "tester" {
     destination = "/tmp/init-tester.sh"
   }
 
+  provisioner "file" {
+    source      = "test.conf"
+    destination = "/tmp/test.conf"
+  }
+
   provisioner "remote-exec" {
     inline = [
       "sudo chmod +x /tmp/init-tester.sh",
-      "sudo /tmp/init-tester.sh ${var.aws_fdb_size} ${var.aws_fdb_count} ${self.private_ip} ${cidrhost(aws_subnet.db.cidr_block, 101)} ${var.aws_tester_size}"
+      "sudo /tmp/init-tester.sh ${var.aws_fdb_size} ${var.aws_fdb_count} ${self.private_ip} ${cidrhost(aws_subnet.db.cidr_block, 101)} ${var.fdb_tester_procs_per_machine} ${var.aws_tester_size}"
     ]
   }
 }
@@ -236,7 +233,7 @@ resource "aws_instance" "fdb" {
 
   tags {
     Name = "${format("fdb-%03d", count.index + 1)}"
-    Project = "TF:bitgn"
+    Project = "TF:poma"
   }
 
   provisioner "file" {

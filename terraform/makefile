@@ -5,6 +5,7 @@ RESET=$(shell tput sgr0)
 
 VARS=".secret.aws.tfvars"
 CURRENT_FOLDER=$(shell basename "$$(pwd)")
+TESTER_ADDR=$(shell cat .tester_address)
 
 help: ## Display help by printing target comments
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -27,8 +28,12 @@ plan: prep ## Show what terraform thinks it will do
 
 apply: plan ## Apply the changes
 	@terraform apply "my.plan"
-	@terraform output tester_address > ~/.bitgn_tester
+	@terraform output tester_address > .tester_address
+
+test: ## Run test from test.conf definition
+	scp test.conf ubuntu@$(TESTER_ADDR):/tmp # update test definition from local file
+	ssh ubuntu@$(TESTER_ADDR) sudo fdbserver -r test -f /tmp/test.conf
+	# test from multiple processes: fdbserver -r multitest -f /tmp/test.conf --num_testers 8
 
 destroy: prep ## Destroy current setup
 	@terraform destroy -var-file="$(VARS)" -lock=false
-	rm ~/.bitgn_tester

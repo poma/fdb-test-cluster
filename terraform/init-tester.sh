@@ -5,13 +5,20 @@ FDB_TYPE=$1
 FDB_COUNT=$2
 SELF_IP=$3
 SEED_IP=$4
-TESTER_TYPE=$5
+FDB_PROCS=$5
+TESTER_TYPE=$6
 
 
 echo "./init-tester.sh $@"
 
+# avoid confusing FoundationDB
+service foundationdb stop
+
 # resolve IP address as host name
 echo "$SELF_IP $(hostname)" >> /etc/hosts
+
+# wipe the data from the image
+rm -rf /var/lib/foundationdb/data/4500/
 
 # make 1st node the coordinator
 echo "Drtu0T4S:i8uQIB9r@$SEED_IP:4500" > /etc/foundationdb/fdb.cluster
@@ -26,3 +33,37 @@ echo "tester_type: $TESTER_TYPE" >> /etc/cluster
 
 # make cluster info readable by anybody
 chmod ugo+r /etc/cluster
+
+# we already have 1 process at 4500
+COUNTER=1
+while [  $COUNTER -lt $FDB_PROCS ]; do
+    let "PORT = COUNTER + 4500"
+    echo "PORT $PORT"
+    echo "[fdbserver.$PORT]" >> /etc/foundationdb/foundationdb.conf
+    sed -i -e "s/# class =/class = test/g" /etc/foundationdb/foundationdb.conf
+    let COUNTER=COUNTER+1
+done
+
+
+# NVME disks aren't formatted. Mounting them in fstab - no good
+# mounting NVME disk: https://stackoverflow.com/questions/45167717/mounting-a-nvme-disk-on-aws-ec2
+
+
+case $VM_TYPE in
+"m3.large" | "m3.medium")
+    echo use local instance store
+    mount /dev/xvdb /var/lib/foundationdb
+    echo /dev/xvdb  /var/lib/foundationdb ext3 defaults,nofail 0 2 >> /etc/fstab
+    mkdir -p /var/lib/foundationdb/data
+    chown -R foundationdb:foundationdb /var/lib/foundationdb
+    ;;
+"i3.large" | "m5d.2xlarge")
+    echo SSD optimized
+    mkfs.ext4 -E nodiscard /dev/nvme1n1
+    mount /dev/nvme1n1 /var/lib/foundationdb
+    mkdir -p /var/lib/foundationdb/data
+    chown -R foundationdb:foundationdb /var/lib/foundationdb
+    ;;
+esac
+
+service foundationdb start

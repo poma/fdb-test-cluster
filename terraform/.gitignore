@@ -3,3 +3,4 @@
 *.plan
 .secret.aws.tfvars
 .terraform*
+.tester_address

@@ -40,17 +40,17 @@ done
 
 
 case $VM_TYPE in
-"m3.large" | "m3.medium" )
+"m3.large" | "m3.medium")
     echo use local instance store
     mount /dev/xvdb /var/lib/foundationdb
     echo /dev/xvdb  /var/lib/foundationdb ext3 defaults,nofail 0 2 >> /etc/fstab
     mkdir -p /var/lib/foundationdb/data
     chown -R foundationdb:foundationdb /var/lib/foundationdb
     ;;
-"i3.large" )
+"i3.large" | "m5d.2xlarge")
     echo SSD optimized
-    mkfs.ext4 -E nodiscard /dev/nvme0n1
-    mount /dev/nvme0n1 /var/lib/foundationdb
+    mkfs.ext4 -E nodiscard /dev/nvme1n1
+    mount /dev/nvme1n1 /var/lib/foundationdb
     mkdir -p /var/lib/foundationdb/data
     chown -R foundationdb:foundationdb /var/lib/foundationdb
     ;;

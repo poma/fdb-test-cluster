@@ -173,7 +173,7 @@ resource "aws_instance" "tester" {
   subnet_id = "${aws_subnet.client.id}"
 
   tags {
-    Name = "Tester"
+    Name = "fdb-tester"
     Project = "TF:poma"
   }
 

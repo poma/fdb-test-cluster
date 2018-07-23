@@ -66,4 +66,4 @@ case $VM_TYPE in
     ;;
 esac
 
-service foundationdb start
+# service foundationdb start

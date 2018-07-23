@@ -26,13 +26,13 @@ echo "Drtu0T4S:i8uQIB9r@$SEED_IP:4500" > /etc/foundationdb/fdb.cluster
 chmod ugo+w /etc/foundationdb/fdb.cluster
 
 # we already have 1 process at 4500
-COUNTER=1
-while [  $COUNTER -lt $FDB_PROCS ]; do
-    let "PORT = COUNTER + 4500"
-    echo "PORT $PORT"
-    echo "[fdbserver.$PORT]" >> /etc/foundationdb/foundationdb.conf
-    let COUNTER=COUNTER+1
-done
+# COUNTER=1
+# while [  $COUNTER -lt $FDB_PROCS ]; do
+#     let "PORT = COUNTER + 4500"
+#     echo "PORT $PORT"
+#     echo "[fdbserver.$PORT]" >> /etc/foundationdb/foundationdb.conf
+#     let COUNTER=COUNTER+1
+# done
 
 
 # NVME disks aren't formatted. Mounting them in fstab - no good
@@ -50,6 +50,7 @@ case $VM_TYPE in
 "i3.large" | "m5d.2xlarge")
     echo SSD optimized
     mkfs.ext4 -E nodiscard /dev/nvme1n1
+    # ext4 filesystems should be mounted with mount options default,noatime,discard
     mount /dev/nvme1n1 /var/lib/foundationdb
     mkdir -p /var/lib/foundationdb/data
     chown -R foundationdb:foundationdb /var/lib/foundationdb
@@ -58,14 +59,14 @@ esac
 
 
 
-if [ "$SELF_IP" == "$SEED_IP" ]; then
-    echo "Seed setup"
-    service foundationdb start
-    sleep 60
-    fdbcli --exec "configure new ssd double" --timeout 60
-    fdbcli --exec "coordinators auto; status" --timeout 60
-else
-    echo "Follower setup"
-    # start the service
-    service foundationdb start
-fi
+# if [ "$SELF_IP" == "$SEED_IP" ]; then
+#     echo "Seed setup"
+#     service foundationdb start
+#     sleep 60
+#     fdbcli --exec "configure new ssd double" --timeout 60
+#     fdbcli --exec "coordinators auto; status" --timeout 60
+# else
+#     echo "Follower setup"
+#     # start the service
+#     service foundationdb start
+# fi

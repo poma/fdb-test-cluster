@@ -32,12 +32,12 @@ mv policy-rc.d /usr/sbin
 cd /tmp
 
 # download the dependencies
-wget https://www.foundationdb.org/downloads/5.1.7/ubuntu/installers/foundationdb-clients_5.1.7-1_amd64.deb
-wget https://www.foundationdb.org/downloads/5.1.7/ubuntu/installers/foundationdb-server_5.1.7-1_amd64.deb
+wget https://www.foundationdb.org/downloads/5.2.5/ubuntu/installers/foundationdb-clients_5.2.5-1_amd64.deb
+wget https://www.foundationdb.org/downloads/5.2.5/ubuntu/installers/foundationdb-server_5.2.5-1_amd64.deb
 
 # server depends on the client packages
-dpkg -i foundationdb-clients_5.1.7-1_amd64.deb
-dpkg -i  foundationdb-server_5.1.7-1_amd64.deb
+dpkg -i foundationdb-clients_5.2.5-1_amd64.deb
+dpkg -i foundationdb-server_5.2.5-1_amd64.deb
 
 # stop the service
 service foundationdb stop

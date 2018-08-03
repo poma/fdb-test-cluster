@@ -1,37 +1,7 @@
-variable "public_key_path" {
-  description = "Path to the SSH public key to be used for authentication."
-  default = "~/.ssh/terraform.pub"
-}
+####### Cluster options ####
 
-variable "private_key_path" {
-  description = "Path to the SSH private key"
-  default = "~/.ssh/terraform"
-}
-
-variable "key_name" {
-   default = "terraform"
-}
-
-
-variable "aws_access_key" {}
-variable "aws_secret_key" {}
-
-variable "aws_region" {
-  default = "eu-west-1"
-  description = "AWS region to launch servers."
-}
-
-variable "aws_availability_zone" {
-  default = "eu-west-1b"
-}
-
-
-// instance store options: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html
-
-# good options:
-# i3.large - will use local NVMe SSD
-# m3.large - will use local instance store
-
+# instance store options: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html
+# m5d.2xlarge - will use local NVMe SSD
 variable "aws_fdb_size" {
   default = "m5d.2xlarge"
   description = "machine type to run FoundationDB servers"
@@ -40,22 +10,39 @@ variable "fdb_procs_per_machine" {
   default = 8
   description = "number of FDB processes per machine"
 }
-# using only 1 machine will conflict with the default cluster config
-# 'configure new memory double'
 variable "aws_fdb_count" {
   default = 8
-  description = "Number of machines in a cluster. Minimum 2"
+  description = "Number of machines in a cluster"
+}
+variable "aws_tester_count" {
+  default = 2
+  description = "Number of tester machines in a cluster"
+}
+variable "fdb_init_string" {
+  default = "configure new memory single proxies=9 resolvers=9 logs=4"
+  description = "FDB initialization string"
 }
 
+####### Misc options #######
 
-# good options
-# m3.large
-# c5.2xlarge
-variable "aws_tester_size" {
-  default = "m5d.2xlarge"
-  description = "instance type for launching tester machines"
+# todo maybe just use the default ssh key?
+variable "public_key_path" {
+  description = "Path to the SSH public key to be used for authentication."
+  default = "~/.ssh/terraform.pub"
 }
-variable "fdb_tester_procs_per_machine" {
-  default = 8
-  description = "number of FDB processes per machine"
+variable "private_key_path" {
+  description = "Path to the SSH private key"
+  default = "~/.ssh/terraform"
+}
+variable "key_name" {
+   default = "terraform"
+}
+variable "aws_access_key" {}
+variable "aws_secret_key" {}
+variable "aws_region" {
+  default = "eu-west-1"
+  description = "AWS region to launch servers."
+}
+variable "aws_availability_zone" {
+  default = "eu-west-1b"
 }

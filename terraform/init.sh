@@ -1,15 +1,13 @@
 #!/bin/bash
 set -e
 
-FDB_TYPE=$1
-FDB_COUNT=$2
-SELF_IP=$3
-SEED_IP=$4
-FDB_PROCS=$5
-TESTER_TYPE=$6
+VM_TYPE=$1
+SELF_IP=$2
+SEED_IP=$3
+FDB_CLUSTER=$4
+FDB_INIT_STRING=$5
 
-
-echo "./init-tester.sh $@"
+echo "./init.sh $@"
 
 # avoid confusing FoundationDB
 service foundationdb stop
@@ -21,34 +19,17 @@ echo "$SELF_IP $(hostname)" >> /etc/hosts
 rm -rf /var/lib/foundationdb/data/4500/
 
 # make 1st node the coordinator
-echo "Drtu0T4S:i8uQIB9r@$SEED_IP:4500" > /etc/foundationdb/fdb.cluster
+echo "$FDB_CLUSTER" > /etc/foundationdb/fdb.cluster
+
+# ensure the correct permissions
+chown -R foundationdb:foundationdb /etc/foundationdb
+chmod -R ug+w /etc/foundationdb
 
 # make sure the cluster file is writeable by everybody
-chmod ugo+w /etc/foundationdb/fdb.cluster
-
-# print cluster info for the benchmarking purposes
-echo "fdb_type: $FDB_TYPE" >> /etc/cluster
-echo "fdb_count: $FDB_COUNT" >> /etc/cluster
-echo "tester_type: $TESTER_TYPE" >> /etc/cluster
-
-# make cluster info readable by anybody
-chmod ugo+r /etc/cluster
-
-# we already have 1 process at 4500
-COUNTER=1
-while [  $COUNTER -lt $FDB_PROCS ]; do
-    let "PORT = COUNTER + 4500"
-    echo "PORT $PORT"
-    echo "[fdbserver.$PORT]" >> /etc/foundationdb/foundationdb.conf
-    sed -i -e "s/# class =/class = test/g" /etc/foundationdb/foundationdb.conf
-    let COUNTER=COUNTER+1
-done
-
+chmod o+w /etc/foundationdb/fdb.cluster
 
 # NVME disks aren't formatted. Mounting them in fstab - no good
 # mounting NVME disk: https://stackoverflow.com/questions/45167717/mounting-a-nvme-disk-on-aws-ec2
-
-
 case $VM_TYPE in
 "m3.large" | "m3.medium")
     echo use local instance store
@@ -60,10 +41,18 @@ case $VM_TYPE in
 "i3.large" | "m5d.2xlarge")
     echo SSD optimized
     mkfs.ext4 -E nodiscard /dev/nvme1n1
+    # ext4 filesystems should be mounted with mount options default,noatime,discard
     mount /dev/nvme1n1 /var/lib/foundationdb
     mkdir -p /var/lib/foundationdb/data
     chown -R foundationdb:foundationdb /var/lib/foundationdb
     ;;
 esac
 
-# service foundationdb start
+service foundationdb start
+
+if [ "$SELF_IP" == "$SEED_IP" ]; then
+    echo "Seed setup"
+    sleep 5 # make sure the service has started
+    fdbcli --exec "$FDB_INIT_STRING" --timeout 60
+    fdbcli --exec "coordinators auto; status" --timeout 60
+fi

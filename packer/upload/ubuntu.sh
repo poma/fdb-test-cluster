@@ -22,10 +22,12 @@ dpkg-reconfigure tzdata
 
 # need to clean since images could have stale metadata
 apt-get clean && apt-get update
-apt-get install -y -qq python lsb linux-aws mosh sysstat iftop build-essential libssl-dev git curl wget htop screen ne
+apt-get install -y -qq build-essential python linux-aws sysstat iftop htop iotop ne
 
-# fix policies (applies to docker)
-mv policy-rc.d /usr/sbin
+# install fdbtop
+curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
+apt-get install -y -qq nodejs
+npm install -g fdbtop
 
 ######### FDB
 
@@ -42,9 +44,15 @@ dpkg -i foundationdb-server_5.2.5-1_amd64.deb
 # stop the service
 service foundationdb stop
 
-#chown -R foundationdb:foundationdb /etc/foundationdb
+# add default user to foundationdb group
+sudo usermod -a -G foundationdb ubuntu
 
-# peeked from here
+# ensure correct permissions
+chown -R foundationdb:foundationdb /etc/foundationdb
+chmod -R ug+w /etc/foundationdb
+
+######### Cleanup
+
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 rm -rf /tmp/*

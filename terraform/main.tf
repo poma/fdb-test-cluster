@@ -24,6 +24,11 @@ resource "aws_vpc" "default" {
   cidr_block = "10.0.0.0/16"
   # this will solve sudo: unable to resolve host ip-10-0-xx-xx
   enable_dns_hostnames = true
+
+  tags = {
+    Name = "FDB Test"
+    Project = "TF:poma"
+  }
 }
 
 
@@ -41,23 +46,9 @@ resource "aws_route" "internet_access" {
 
 
 # Create a subnet to launch our instances into
-resource "aws_subnet" "client" {
-  vpc_id                  = "${aws_vpc.default.id}"
-  cidr_block              = "10.0.1.0/24"
-  map_public_ip_on_launch = true
-  availability_zone = "${var.aws_availability_zone}"
-
-  tags = {
-    Name = "Client Subnet"
-    Project = "TF:poma"
-  }
-}
-
-
-# Create a subnet to launch our instances into
 resource "aws_subnet" "db" {
   vpc_id                  = "${aws_vpc.default.id}"
-  cidr_block              = "10.0.2.0/24"
+  cidr_block              = "10.0.1.0/24"
   map_public_ip_on_launch = true
   availability_zone = "${var.aws_availability_zone}"
 
@@ -68,46 +59,7 @@ resource "aws_subnet" "db" {
 }
 
 
-
-# security group with only SSH access
-resource "aws_security_group" "tester_group" {
-  name        = "tf_tester_group"
-  description = "Terraform: SSH and FDB and mosh"
-  vpc_id      = "${aws_vpc.default.id}"
-
-  # SSH access from anywhere
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Mosh UDP ports
-  ingress {
-    from_port   = 60000
-    to_port     = 60010
-    protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # FDB access from the VPC. We open a port for each process
-  ingress {
-    from_port   = 4500
-    to_port     = "${4500 + var.fdb_procs_per_machine - 1}"
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
-  }
-  # outbound internet access
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-# security group with only SSH access
+# security group with SSH and FDB access
 resource "aws_security_group" "fdb_group" {
   name        = "tf_fdb_group"
   description = "Terraform: SSH and FDB"
@@ -137,10 +89,84 @@ resource "aws_security_group" "fdb_group" {
   }
 }
 
-
 resource "aws_key_pair" "auth" {
   key_name   = "${var.key_name}"
   public_key = "${file(var.public_key_path)}"
+}
+
+# Random cluster identifier strings
+resource "random_string" "cluster_description" {
+  length = 8
+  special = false
+}
+resource "random_string" "cluster_id" {
+  length = 8
+  special = false
+}
+
+locals {
+  # FDB seed controller
+  fdb_seed = "${cidrhost(aws_subnet.db.cidr_block, 101)}"
+  # fdb.cluster file contents
+  fdb_cluster = "${random_string.cluster_description.result}:${random_string.cluster_id.result}@${local.fdb_seed}:4500"
+}
+
+resource "aws_instance" "fdb" {
+  # The connection block tells our provisioner how to
+  # communicate with the resource (instance)
+  connection {
+    # The default username for our AMI
+    user = "ubuntu"
+    agent = "false"
+
+    private_key = "${file(var.private_key_path)}"
+    # The connection will use the local SSH agent for authentication.
+  }
+
+
+  availability_zone = "${var.aws_availability_zone}"
+  instance_type = "${var.aws_fdb_size}"
+  count = "${var.aws_fdb_count}"
+  # Grab AMI id from the data source
+  ami = "${data.aws_ami.fdb.id}"
+
+
+  # I want a very specific IP address to be assigned. However
+  # AWS reserves both the first four IP addresses and the last IP address
+  # in each subnet CIDR block. They're not available for you to use.
+  private_ip = "${cidrhost(aws_subnet.db.cidr_block, count.index + 1 + 100)}"
+
+
+  # The name of our SSH keypair we created above.
+  key_name = "${aws_key_pair.auth.id}"
+
+  # Our Security group to allow HTTP and SSH access
+  vpc_security_group_ids = ["${aws_security_group.fdb_group.id}"]
+
+  # We're going to launch into the DB subnet
+  subnet_id = "${aws_subnet.db.id}"
+
+  tags {
+    Name = "${format("fdb-%02d", count.index + 1)}"
+    Project = "TF:poma"
+  }
+
+  provisioner "file" {
+    source      = "init.sh"
+    destination = "/tmp/init.sh"
+  }
+
+  provisioner "file" {
+    source      = "conf/${count.index + 1}.ini"
+    destination = "/etc/foundationdb/foundationdb.conf"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo chmod +x /tmp/init.sh",
+      "sudo /tmp/init.sh ${var.aws_fdb_size} ${self.private_ip} ${local.fdb_seed} '${local.fdb_cluster}' '${var.fdb_init_string}'",
+    ]
+  }
 }
 
 
@@ -157,70 +183,11 @@ resource "aws_instance" "tester" {
   }
 
 
-  instance_type = "${var.aws_tester_size}"
-  availability_zone = "${var.aws_availability_zone}"
-
-  # Grab AMI id from the data source
-  ami = "${data.aws_ami.fdb.id}"
-
-  # The name of our SSH keypair we created above.
-  key_name = "${aws_key_pair.auth.id}"
-
-  # Our Security group to allow HTTP and SSH access
-  vpc_security_group_ids = ["${aws_security_group.tester_group.id}"]
-
-  # We're going to launch into the client subnet.
-  subnet_id = "${aws_subnet.client.id}"
-
-  tags {
-    Name = "fdb-tester"
-    Project = "TF:poma"
-  }
-
-  provisioner "file" {
-    source      = "init-tester.sh"
-    destination = "/tmp/init-tester.sh"
-  }
-
-  provisioner "file" {
-    source      = "test.conf"
-    destination = "/tmp/test.conf"
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "sudo chmod +x /tmp/init-tester.sh",
-      "sudo /tmp/init-tester.sh ${var.aws_fdb_size} ${var.aws_fdb_count} ${self.private_ip} ${cidrhost(aws_subnet.db.cidr_block, 101)} ${var.fdb_tester_procs_per_machine} ${var.aws_tester_size}"
-    ]
-  }
-}
-
-
-
-resource "aws_instance" "fdb" {
-  # The connection block tells our provisioner how to
-  # communicate with the resource (instance)
-  connection {
-    # The default username for our AMI
-    user = "ubuntu"
-    agent = "false"
-
-    private_key = "${file(var.private_key_path)}"
-    # The connection will use the local SSH agent for authentication.
-  }
-
   availability_zone = "${var.aws_availability_zone}"
   instance_type = "${var.aws_fdb_size}"
-  count = "${var.aws_fdb_count}"
+  count = "${var.aws_tester_count}"
   # Grab AMI id from the data source
   ami = "${data.aws_ami.fdb.id}"
-
-
-  # I want a very specific IP address to be assigned. However
-  # AWS reserves both the first four IP addresses and the last IP address
-  # in each subnet CIDR block. They're not available for you to use.
-  private_ip = "${cidrhost(aws_subnet.db.cidr_block, count.index+1+100)}"
-
 
   # The name of our SSH keypair we created above.
   key_name = "${aws_key_pair.auth.id}"
@@ -232,19 +199,24 @@ resource "aws_instance" "fdb" {
   subnet_id = "${aws_subnet.db.id}"
 
   tags {
-    Name = "${format("fdb-%03d", count.index + 1)}"
+    Name = "${format("fdb-tester-%02d", count.index + 1)}"
     Project = "TF:poma"
   }
 
   provisioner "file" {
-    source      = "init-fdb.sh"
-    destination = "/tmp/init-fdb.sh"
+    source      = "init.sh"
+    destination = "/tmp/init.sh"
+  }
+
+  provisioner "file" {
+    source      = "conf/tester.ini"
+    destination = "/tmp/foundationdb.conf"
   }
 
   provisioner "remote-exec" {
     inline = [
-      "sudo chmod +x /tmp/init-fdb.sh",
-      "sudo /tmp/init-fdb.sh ${var.aws_fdb_size} ${var.aws_fdb_count} ${self.private_ip} ${cidrhost(aws_subnet.db.cidr_block, 101)} ${var.fdb_procs_per_machine}",
+      "sudo chmod +x /tmp/init.sh",
+      "sudo /tmp/init.sh ${var.aws_fdb_size} ${self.private_ip} ${local.fdb_seed} '${local.fdb_cluster}' '${var.fdb_init_string}'",
     ]
   }
 }

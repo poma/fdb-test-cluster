@@ -19,7 +19,7 @@ variable "aws_tester_count" {
   description = "Number of tester machines in a cluster"
 }
 variable "fdb_init_string" {
-  default = "configure new memory single proxies=9 resolvers=9 logs=4"
+  default = "configure new ssd double proxies=4 resolvers=2 logs=2"
   description = "FDB initialization string"
 }
 

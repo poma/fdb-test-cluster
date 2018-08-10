@@ -2,6 +2,11 @@ provider "aws" {
   access_key = "${var.aws_access_key}"
   secret_key = "${var.aws_secret_key}"
   region     = "${var.aws_region}"
+  version    = "~> 1.30"
+}
+
+provider "random" {
+  version    = "~> 1.3"
 }
 
 
@@ -210,7 +215,7 @@ resource "aws_instance" "tester" {
 
   provisioner "file" {
     source      = "conf/tester.ini"
-    destination = "/tmp/foundationdb.conf"
+    destination = "/etc/foundationdb/foundationdb.conf"
   }
 
   provisioner "remote-exec" {

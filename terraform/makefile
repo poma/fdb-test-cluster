@@ -33,8 +33,8 @@ apply: plan ## Apply the terraform plan
 reapply: init ## Recreate all fdb nodes
 	@terraform taint random_string.cluster_description
 	@terraform taint random_string.cluster_id
-	@terraform show | grep "^aws_instance.fdb."    | sed 's/ (tainted)//' | sed 's/://' | xargs -I '{}' terraform taint {}
-	@terraform show | grep "^aws_instance.tester." | sed 's/ (tainted)//' | sed 's/://' | xargs -I '{}' terraform taint {}
+	@terraform show -no-color | grep "^aws_instance.fdb."    | sed 's/ (tainted)//' | sed 's/://' | xargs -I '{}' terraform taint {}
+	@terraform show -no-color | grep "^aws_instance.tester." | sed 's/ (tainted)//' | sed 's/://' | xargs -I '{}' terraform taint {}
 	@$(MAKE) apply
 
 test: init ## Run the benchmark from test.conf definition on a single test node
@@ -43,10 +43,10 @@ test: init ## Run the benchmark from test.conf definition on a single test node
 
 multitest: init ## Run the benchmark from test.conf definition on all test nodes
 	@scp -i ~/.ssh/terraform -q test.conf ubuntu@$(MASTER_ADDR):/tmp
-	@ssh -i ~/.ssh/terraform ubuntu@$(MASTER_ADDR) sudo fdbserver -f /tmp/test.conf  -r multitest
+	@ssh -i ~/.ssh/terraform ubuntu@$(MASTER_ADDR) sudo fdbserver -f /tmp/test.conf -r multitest
 
 reconfigure: init ## Copy node configurations to hosts (fdb should automatically detect and apply them)
-	@echo "$(FDB_ADDR)"     | tr ' ' '\n' | awk '{print "-i ~/.ssh/terraform conf/" NR ".ini ubuntu@" $$1 ":/etc/foundationdb/foundationdb.conf"}' | xargs -L 1 -P 10 scp
+	@echo "$(FDB_ADDR)"    | tr ' ' '\n' | awk '{print "-i ~/.ssh/terraform conf/" NR ".ini ubuntu@" $$1 ":/etc/foundationdb/foundationdb.conf"}' | xargs -L 1 -P 10 scp
 	@echo "$(TESTER_ADDR)" | tr ' ' '\n' | awk '{print "-i ~/.ssh/terraform conf/tester.ini ubuntu@" $$1 ":/etc/foundationdb/foundationdb.conf"}' | xargs -L 1 -P 10 scp
 
 add-keys: init ## Add ssh keys of all machines to known_hosts

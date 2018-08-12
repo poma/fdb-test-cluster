@@ -15,7 +15,9 @@ variable "aws_fdb_count" {
   description = "Number of machines in a cluster"
 }
 variable "aws_tester_count" {
-  default = 2
+  # make sure there are enough testers so that they 
+  # are not saturated (cpu < 100%) to get accurate results
+  default = 4
   description = "Number of tester machines in a cluster"
 }
 variable "fdb_init_string" {

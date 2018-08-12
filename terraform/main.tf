@@ -194,6 +194,12 @@ resource "aws_instance" "tester" {
   # Grab AMI id from the data source
   ami = "${data.aws_ami.fdb.id}"
 
+    # I want a very specific IP address to be assigned. However
+  # AWS reserves both the first four IP addresses and the last IP address
+  # in each subnet CIDR block. They're not available for you to use.
+  private_ip = "${cidrhost(aws_subnet.db.cidr_block, count.index + 1 + 200)}"
+
+
   # The name of our SSH keypair we created above.
   key_name = "${aws_key_pair.auth.id}"
 

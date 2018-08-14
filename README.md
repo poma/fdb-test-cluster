@@ -20,6 +20,8 @@ a Mac you can install them using homebrew:
 brew install packer terraform
 ```
 
+The scripts are based on [bitgn/fdb-cloud-test](https://github.com/bitgn/fdb-cloud-test)
+
 # Creating AMIs
 
 First you need to create packer images for FDB and tester
@@ -221,7 +223,9 @@ cluster.
 The configuration for each node is stored in `conf/*.ini` files. Each file 
 corresponds to a node with the same number (you will have to create 
 more config files if you want to make your cluster larger). Testing nodes have 
-identical configs stored in `conf/tester.ini`. 
+identical configs stored in `conf/tester.ini`. The configs are intentionally made as 
+a separate files instead of a script that generates them from an array of roles 
+to allow easy per process tuning, for example adding memory to storage processess. 
 
 You can quickly update configs on all your cluster nodes without recreating or restarting them by using
 
@@ -246,11 +250,35 @@ $ make clean
 
 # Monitoring performance
 
-Most useful things can be monitored by running included fdbtop
+Most useful things can be monitored by running included [fdbtop](https://github.com/poma/fdbtop)
 utility on one of your test nodes (run `fdbtop --help` for more info). 
 
 ```
 $ fdbtop
+
+<ip>          port    cpu%  mem%  iops  net    class                 roles
+------------  ------  ----  ----  ----  -----  --------------------  --------------------
+ 10.0.2.101    4500    5     3     6     2      cluster_controller    cluster_controller
+               4501    84    6     6     143    transaction           log
+               4504    1     2     6     0      proxy
+               4505    87    3     6     182    proxy                 proxy
+               4506    0     3     6     0      resolution
+               4507    27    2     6     9      master                master
+------------  ------  ----  ----  ----  -----  --------------------  --------------------
+ 10.0.2.102    4500    58    6     4     91     transaction           log
+               4501    1     2     4     0      proxy
+               4504    58    3     4     116    proxy                 proxy
+               4505    58    3     4     117    proxy                 proxy
+               4506    38    4     4     34     resolution            resolver
+               4507    0     2     4     0      master
+------------  ------  ----  ----  ----  -----  --------------------  --------------------
+ 10.0.2.103    4500    83    16    33    46     storage               storage
+               4501    0     2     33    0      proxy
+               4503    92    18    33    78     storage               storage
+               4504    45    3     33    102    proxy                 proxy
+               4505    0     2     33    0      proxy
+               4506    25    3     33    30     resolution            resolver
+               4507    0     2     33    0      master
 ```
 
 You can also monitor general stats by running `status` command in 
